@@ -1,0 +1,1 @@
+#you can place all the constants at one place.

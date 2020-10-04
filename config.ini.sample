@@ -1,0 +1,9 @@
+[prod]
+base_url=<base_url for prod instance>
+
+[qa]
+base_url=<base_url for qa instance>
+
+[auth]
+username=<username>
+password=<password>
