@@ -1,0 +1,80 @@
+pipeline {
+
+    agent any
+
+    triggers {
+        cron('H 10 * * 1-5')
+    }
+
+    parameters {
+        choice(choices: ['qa', 'dev', 'stage'], description: 'Env to run the API tests against', name: 'ENV')
+    }
+
+    stages {
+        stage('Checkout scm') {
+            steps {
+                checkout([$class: 'GitSCM', branches: [[name: '*/master']],
+                    userRemoteConfigs: [[url: 'https://github.com/the-test-trove/api-tests-lcc.git']]])
+
+            }
+        }
+
+        stage('Execute the API tests') {
+            steps {
+                script {
+                   sh """
+                        pwd
+                        ls -a
+                        python3 -m venv api-test-env
+                        source api-test-env/bin/activate
+
+                        pip3 install -r requirements.txt
+                        ls -a
+
+                        # Running the tests
+                        lcc run
+                        # Displaying the reports on console
+                        lcc report
+                        """
+                        sh 'pwd'
+                        sh 'ls -a'
+
+                }
+            }
+
+            post {
+                always {
+                    archiveArtifacts artifacts: 'report/**'
+                    echo 'Publishing html reports...'
+                    sh 'pwd'
+                    sh 'ls -a'
+
+                    publishHTML([allowMissing: false,
+                     alwaysLinkToLastBuild: true,
+                     keepAll: true,
+                     reportDir: 'report',
+                     reportFiles: 'report.html',
+                     reportName: 'api_test_report_demo',
+                     reportTitles: 'API test suite - Ministry of Testing demo'
+                     ])
+
+                    echo 'Removing config file...'
+                    sh 'rm config.ini'
+                }
+            }
+        }
+    }
+    post {
+        always {
+            echo 'Running the post section.. sending out emails..'
+            mail to: "anisha@example.com, swapnil@example.com",
+            body: """<b>API tests for Ministry of Testing demo status:</b><br><br>Project: ${env.JOB_NAME}
+            <br><br>Build Number: ${env.BUILD_NUMBER}
+            <br> Build URL: ${env.BUILD_URL}
+            <br> Please check the report for tests here: ${env.BUILD_URL}report/""",
+            charset: 'UTF-8', from: '', mimeType: 'text/html', replyTo: '',
+            subject: "${currentBuild.currentResult} :: API tests: Job -> ${env.JOB_NAME}";
+        }
+    }
+
+}
